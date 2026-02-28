@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Brain, Lightbulb, Shield, Loader2 } from 'lucide-react';
+import { Brain, Lightbulb, Shield, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AgentCard, AgentConfig, AgentCardData } from '@/components/AgentCard';
 
@@ -257,17 +257,157 @@ function AgentCardsEmptyState() {
   );
 }
 
+/* ─── Score formula ──────────────────────────────────────────────── */
+function computeFinalScore(results: Record<string, AgentCardData>): number {
+  const f = results['feasibility']?.score ?? 0;
+  const i = results['innovation']?.score ?? 0;
+  const r = results['risk']?.score ?? 0;
+  return Math.round(f * 0.45 + i * 0.35 + (100 - r) * 0.2);
+}
+
+/* ─── Final Verdict ───────────────────────────────────────────────── */
+function FinalVerdict({ score }: { score: number }) {
+  let Icon: typeof CheckCircle;
+  let label: string;
+  let iconClass: string;
+  let ringClass: string;
+  let scoreLabelClass: string;
+
+  if (score >= 70) {
+    Icon = CheckCircle;
+    label = 'Ship MVP';
+    iconClass = 'text-emerald-400';
+    ringClass = 'border-emerald-500/30';
+    scoreLabelClass = 'text-emerald-400';
+  } else if (score >= 50) {
+    Icon = AlertCircle;
+    label = 'Iterate First';
+    iconClass = 'text-yellow-400';
+    ringClass = 'border-yellow-500/30';
+    scoreLabelClass = 'text-yellow-400';
+  } else {
+    Icon = XCircle;
+    label = 'Reject — Major Issues';
+    iconClass = 'text-red-400';
+    ringClass = 'border-red-500/30';
+    scoreLabelClass = 'text-red-400';
+  }
+
+  return (
+    <div
+      className={cn(
+        'w-full max-w-6xl mx-auto mt-4 mb-10 rounded-2xl p-8',
+        'bg-gradient-to-br from-purple-950/70 via-blue-950/60 to-purple-950/70',
+        'border',
+        ringClass,
+        'backdrop-blur-xl',
+        'animate-[fadeSlideUp_0.5s_ease_both]'
+      )}
+    >
+      <div className="flex flex-col md:flex-row items-center gap-8">
+        {/* Score ring */}
+        <div className="flex-shrink-0 flex flex-col items-center gap-2">
+          <div
+            className={cn(
+              'flex items-center justify-center w-32 h-32 rounded-full',
+              'border-4',
+              ringClass,
+              'bg-black/30'
+            )}
+          >
+            <div className="text-center">
+              <span className="block text-4xl font-black text-white tabular-nums leading-none">
+                {score}
+              </span>
+              <span className="text-xs text-slate-500 font-medium">/ 100</span>
+            </div>
+          </div>
+          <span className={cn('text-xs font-semibold uppercase tracking-wider', scoreLabelClass)}>
+            Final Score
+          </span>
+        </div>
+
+        {/* Verdict text */}
+        <div className="flex-1 text-center md:text-left">
+          <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
+            <Icon className={cn('w-7 h-7', iconClass)} />
+            <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
+              {label}
+            </h2>
+          </div>
+          <p className="text-sm text-slate-400 max-w-md">
+            Based on a weighted evaluation across feasibility (45%), innovation
+            (35%), and risk (20%).
+          </p>
+
+          {/* Weight breakdown */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            {[
+              { label: 'Feasibility', weight: '45%', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10' },
+              { label: 'Innovation', weight: '35%', color: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10' },
+              { label: 'Risk (inv.)', weight: '20%', color: 'text-red-400 border-red-500/30 bg-red-500/10' },
+            ].map((w) => (
+              <span
+                key={w.label}
+                className={cn(
+                  'inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border',
+                  w.color
+                )}
+              >
+                <span className="font-semibold">{w.weight}</span>
+                <span className="text-slate-500">{w.label}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Save On-Chain button */}
+        <div className="flex-shrink-0">
+          <button
+            id="save-onchain-btn"
+            disabled
+            aria-disabled="true"
+            title="On-chain saving coming soon"
+            className={cn(
+              'inline-flex flex-col items-center gap-1.5 px-6 py-4 rounded-xl',
+              'border border-emerald-500/20 bg-emerald-500/5',
+              'text-emerald-700 cursor-not-allowed select-none',
+              'transition-all duration-200'
+            )}
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
+            </svg>
+            <span className="text-xs font-semibold">Save Verdict On-Chain</span>
+            <span className="text-[10px] text-emerald-900/60">Coming soon</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Results grid ────────────────────────────────────────────────── */
-function ResultsGrid({ results }: { results: Record<string, AgentCardData> }) {
+function ResultsGrid({ results, finalScore }: { results: Record<string, AgentCardData>; finalScore: number }) {
   return (
     <section className="w-full max-w-6xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
-        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-widest">Verdict</h2>
+        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-widest">Evaluation</h2>
         <div className="flex-1 h-px bg-white/5" />
         <span className="text-xs text-emerald-500 font-medium">✓ Evaluation complete</span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {AGENTS.map((agent, i) => {
           const data = results[agent.id];
           return data ? (
@@ -276,8 +416,10 @@ function ResultsGrid({ results }: { results: Record<string, AgentCardData> }) {
         })}
       </div>
 
+      <FinalVerdict score={finalScore} />
+
       {/* Evaluate again button */}
-      <div className="text-center pb-4">
+      <div className="text-center pb-8">
         <button
           id="reset-btn"
           onClick={() => window.location.reload()}
@@ -301,13 +443,12 @@ export default function HomePage() {
   async function handleSubmit() {
     if (!caseText.trim()) return;
     setStatus('loading');
-
-    // Simulate agent deliberation delay
     await new Promise((r) => setTimeout(r, 2500));
-
     setResults(MOCK_RESULTS);
     setStatus('done');
   }
+
+  const finalScore = results ? computeFinalScore(results) : 0;
 
   return (
     <main className="relative min-h-screen px-4 py-16 md:py-24">
@@ -323,7 +464,9 @@ export default function HomePage() {
 
         {status === 'idle' && <AgentCardsEmptyState />}
         {status === 'loading' && <EvaluationLoading />}
-        {status === 'done' && results && <ResultsGrid results={results} />}
+        {status === 'done' && results && (
+          <ResultsGrid results={results} finalScore={finalScore} />
+        )}
       </div>
     </main>
   );
