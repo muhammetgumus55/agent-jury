@@ -30,24 +30,7 @@ const AGENTS: AgentConfig[] = [
   },
 ];
 
-/* ─── Mock evaluation results ─────────────────────────────────────── */
-const MOCK_RESULTS: Record<string, AgentCardData> = {
-  feasibility: {
-    score: 78,
-    pros: ['Quick to build', 'Clear MVP scope'],
-    cons: ['Limited features'],
-  },
-  innovation: {
-    score: 65,
-    pros: ['Novel approach', 'Good differentiation'],
-    cons: ['Seen before'],
-  },
-  risk: {
-    score: 25,
-    pros: ['Low security risk'],
-    cons: ['Spam potential'],
-  },
-};
+
 
 /* ─── Background blobs ────────────────────────────────────────────── */
 function BackgroundBlobs() {
@@ -433,19 +416,41 @@ function ResultsGrid({ results, finalScore }: { results: Record<string, AgentCar
 }
 
 /* ─── Page root ───────────────────────────────────────────────────── */
-type Status = 'idle' | 'loading' | 'done';
+type Status = 'idle' | 'loading' | 'done' | 'error';
 
 export default function HomePage() {
   const [caseText, setCaseText] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [results, setResults] = useState<Record<string, AgentCardData> | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function handleSubmit() {
     if (!caseText.trim()) return;
+
     setStatus('loading');
-    await new Promise((r) => setTimeout(r, 2500));
-    setResults(MOCK_RESULTS);
-    setStatus('done');
+    setErrorMsg(null);
+
+    try {
+      const res = await fetch('/api/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caseText }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error ?? `API error: ${res.status}`);
+      }
+
+      // API returns { agents: { feasibility, innovation, risk }, finalScore, verdict }
+      setResults(data.agents);
+      setStatus('done');
+    } catch (err) {
+      console.error('[Agent Jury] Evaluation failed:', err);
+      setErrorMsg(err instanceof Error ? err.message : 'Beklenmeyen bir hata oluştu.');
+      setStatus('error');
+    }
   }
 
   const finalScore = results ? computeFinalScore(results) : 0;
@@ -462,7 +467,24 @@ export default function HomePage() {
           disabled={status === 'loading' || status === 'done'}
         />
 
-        {status === 'idle' && <AgentCardsEmptyState />}
+        {/* Error banner */}
+        {status === 'error' && errorMsg && (
+          <div className="w-full max-w-3xl mx-auto mb-8 px-4 py-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-sm flex items-start gap-3">
+            <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold mb-0.5">Değerlendirme başarısız</p>
+              <p className="text-red-400/70">{errorMsg}</p>
+              <button
+                onClick={() => { setStatus('idle'); setErrorMsg(null); }}
+                className="mt-2 text-xs text-red-400 underline hover:text-red-300"
+              >
+                Tekrar dene
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(status === 'idle' || status === 'error') && <AgentCardsEmptyState />}
         {status === 'loading' && <EvaluationLoading />}
         {status === 'done' && results && (
           <ResultsGrid results={results} finalScore={finalScore} />

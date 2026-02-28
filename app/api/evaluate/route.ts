@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { NextRequest, NextResponse } from 'next/server';
 
 /* ─── Types ──────────────────────────────────────────────────────── */
@@ -21,7 +21,13 @@ interface EvaluateResponse {
     verdict: Verdict;
 }
 
-/* ─── Agent prompt definitions ────────────────────────────────────── */
+/* ─── Config ─────────────────────────────────────────────────────── */
+// OpenRouter passes your request to the underlying provider.
+// gpt-4o-mini is cheap, fast, and excellent at structured JSON output.
+const MODEL = 'openai/gpt-4o-mini';
+const MAX_RETRIES = 2;
+
+/* ─── Agent prompts ──────────────────────────────────────────────── */
 const AGENT_PROMPTS = {
     feasibility:
         'You are a feasibility analyst for hackathon projects. Rate 0-100 how achievable this is in 6 hours. ' +
@@ -37,10 +43,23 @@ const AGENT_PROMPTS = {
         'Return ONLY valid JSON: {"score": number, "pros": string[], "cons": string[], "questions": string[]}',
 } as const;
 
-/* ─── Helpers ─────────────────────────────────────────────────────── */
+/* ─── Helpers ────────────────────────────────────────────────────── */
+function sleep(ms: number) {
+    return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+function isRateLimitError(err: unknown): boolean {
+    if (!(err instanceof Error)) return false;
+    return (
+        err.message.includes('429') ||
+        err.message.toLowerCase().includes('quota') ||
+        err.message.toLowerCase().includes('rate limit') ||
+        err.message.toLowerCase().includes('too many requests')
+    );
+}
 
 /**
- * Strip markdown code fences (```json ... ``` or ``` ... ```) then parse.
+ * Strip markdown code fences (```json...```) then parse.
  */
 function parseAgentJSON(raw: string): AgentResult {
     const stripped = raw
@@ -55,20 +74,12 @@ function parseAgentJSON(raw: string): AgentResult {
         score: Math.max(0, Math.min(100, Number(parsed.score) || 0)),
         pros: Array.isArray(parsed.pros) ? parsed.pros.map(String) : [],
         cons: Array.isArray(parsed.cons) ? parsed.cons.map(String) : [],
-        questions: Array.isArray(parsed.questions)
-            ? parsed.questions.map(String)
-            : [],
+        questions: Array.isArray(parsed.questions) ? parsed.questions.map(String) : [],
     };
 }
 
-function computeFinalScore(
-    feasibility: number,
-    innovation: number,
-    risk: number
-): number {
-    return Math.round(
-        feasibility * 0.45 + innovation * 0.35 + (100 - risk) * 0.2
-    );
+function computeFinalScore(f: number, i: number, r: number): number {
+    return Math.round(f * 0.45 + i * 0.35 + (100 - r) * 0.2);
 }
 
 function deriveVerdict(score: number): Verdict {
@@ -77,63 +88,92 @@ function deriveVerdict(score: number): Verdict {
     return 'Reject - Major Issues';
 }
 
-/* ─── Single agent call ───────────────────────────────────────────── */
+/* ─── Single agent call with retry ──────────────────────────────── */
 async function runAgent(
-    genAI: GoogleGenerativeAI,
+    client: OpenAI,
     agentKey: keyof typeof AGENT_PROMPTS,
-    caseText: string
+    caseText: string,
+    attempt = 1
 ): Promise<AgentResult> {
-    const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
-        systemInstruction: AGENT_PROMPTS[agentKey],
-        generationConfig: { temperature: 0.7 },
-    });
+    try {
+        const response = await client.chat.completions.create({
+            model: MODEL,
+            temperature: 0.7,
+            messages: [
+                { role: 'system', content: AGENT_PROMPTS[agentKey] },
+                { role: 'user', content: caseText },
+            ],
+        });
 
-    const result = await model.generateContent(caseText);
-    const content = result.response.text();
+        const content = response.choices[0]?.message?.content;
+        if (!content) throw new Error(`${agentKey} agent returned empty content`);
 
-    if (!content) {
-        throw new Error(`${agentKey} agent returned empty content`);
+        return parseAgentJSON(content);
+
+    } catch (err: unknown) {
+        // Retry on rate-limit with exponential backoff
+        if (isRateLimitError(err) && attempt <= MAX_RETRIES) {
+            const delaySec = 10 * attempt; // 10s, 20s
+            console.warn(
+                `[Agent Jury] ${agentKey}: rate-limit on attempt ${attempt}/${MAX_RETRIES}. Retrying in ${delaySec}s…`
+            );
+            await sleep(delaySec * 1000);
+            return runAgent(client, agentKey, caseText, attempt + 1);
+        }
+
+        if (err instanceof SyntaxError) {
+            throw new Error(`${agentKey} agent returned malformed JSON.`);
+        }
+
+        throw err;
     }
-
-    return parseAgentJSON(content);
 }
 
-/* ─── Route handler ───────────────────────────────────────────────── */
+/* ─── Route handler ──────────────────────────────────────────────── */
 export async function POST(request: NextRequest) {
+    // Validate input
+    let caseText: string;
     try {
         const body = await request.json();
-        const caseText: string = body?.caseText;
-
+        caseText = body?.caseText;
         if (!caseText || typeof caseText !== 'string' || !caseText.trim()) {
-            return NextResponse.json(
-                { error: 'Missing or empty caseText in request body.' },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: 'caseText eksik veya boş.' }, { status: 400 });
         }
+    } catch {
+        return NextResponse.json({ error: 'Geçersiz JSON gövdesi.' }, { status: 400 });
+    }
 
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            return NextResponse.json(
-                { error: 'GEMINI_API_KEY environment variable is not set.' },
-                { status: 500 }
-            );
-        }
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+        return NextResponse.json(
+            { error: 'OPENROUTER_API_KEY environment variable tanımlanmamış.' },
+            { status: 500 }
+        );
+    }
 
-        const genAI = new GoogleGenerativeAI(apiKey);
+    // OpenRouter is fully OpenAI-compatible — just swap the baseURL
+    const client = new OpenAI({
+        baseURL: 'https://openrouter.ai/api/v1',
+        apiKey,
+        defaultHeaders: {
+            'HTTP-Referer': 'http://localhost:3001',
+            'X-Title': 'Agent Jury',
+        },
+    });
 
-        // Run all 3 agents in parallel
+    try {
+        // OpenRouter has much more generous rate limits → run all 3 agents in parallel
+        console.log('[Agent Jury] Running 3 agents in parallel via OpenRouter…');
+
         const [feasibility, innovation, risk] = await Promise.all([
-            runAgent(genAI, 'feasibility', caseText),
-            runAgent(genAI, 'innovation', caseText),
-            runAgent(genAI, 'risk', caseText),
+            runAgent(client, 'feasibility', caseText),
+            runAgent(client, 'innovation', caseText),
+            runAgent(client, 'risk', caseText),
         ]);
 
-        const finalScore = computeFinalScore(
-            feasibility.score,
-            innovation.score,
-            risk.score
-        );
+        const finalScore = computeFinalScore(feasibility.score, innovation.score, risk.score);
+
+        console.log(`[Agent Jury] Done. Scores: F=${feasibility.score} I=${innovation.score} R=${risk.score} → Final=${finalScore} (${deriveVerdict(finalScore)})`);
 
         const result: EvaluateResponse = {
             agents: { feasibility, innovation, risk },
@@ -142,16 +182,24 @@ export async function POST(request: NextRequest) {
         };
 
         return NextResponse.json(result, { status: 200 });
-    } catch (error: unknown) {
-        console.error('[/api/evaluate] Error:', error);
 
-        const message =
-            error instanceof SyntaxError
-                ? 'Failed to parse agent JSON response. The model may have returned malformed output.'
-                : error instanceof Error
-                    ? error.message
-                    : 'An unexpected error occurred.';
+    } catch (err: unknown) {
+        console.error('[/api/evaluate] Error:', err);
 
-        return NextResponse.json({ error: message }, { status: 500 });
+        let userMessage: string;
+        let httpStatus = 500;
+
+        if (isRateLimitError(err)) {
+            userMessage = 'OpenRouter rate limiti aşıldı. Lütfen bir süre bekleyip tekrar deneyin.';
+            httpStatus = 429;
+        } else if (err instanceof SyntaxError) {
+            userMessage = 'Model geçersiz JSON döndürdü. Lütfen tekrar deneyin.';
+        } else if (err instanceof Error) {
+            userMessage = err.message;
+        } else {
+            userMessage = 'Beklenmeyen bir hata oluştu.';
+        }
+
+        return NextResponse.json({ error: userMessage }, { status: httpStatus });
     }
 }
