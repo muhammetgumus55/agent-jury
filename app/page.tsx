@@ -6,6 +6,7 @@ import { Brain, Lightbulb, Shield, CheckCircle, AlertCircle, XCircle } from 'luc
 import { cn } from '@/lib/utils';
 import { AgentCard, AgentConfig, AgentCardData } from '@/components/AgentCard';
 import { saveVerdictToChain, EvalResults } from '@/lib/contract';
+import Footer from '@/components/Footer';
 
 /* ─── Agent definitions ───────────────────────────────────────────── */
 const AGENTS: AgentConfig[] = [
@@ -678,6 +679,7 @@ export default function HomePage() {
           <ResultsGrid results={results} finalScore={finalScore} caseText={caseText} />
         )}
       </div>
+      <Footer />
     </main>
   );
 }
