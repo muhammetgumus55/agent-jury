@@ -96,7 +96,7 @@ export interface EvalResults {
  */
 export async function connectWallet(): Promise<string> {
     if (typeof window === 'undefined' || !window.ethereum) {
-        throw new Error('MetaMask bulunamadı — lütfen tarayıcı eklentisini yükleyin.');
+        throw new Error('MetaMask not found — please install the browser extension.');
     }
 
     // Add/switch chain first (wallet_addEthereumChain handles "already added")
@@ -123,7 +123,7 @@ export async function connectWallet(): Promise<string> {
     })) as string[];
 
     if (!accounts || accounts.length === 0) {
-        throw new Error('Cüzdan bağlantısı reddedildi.');
+        throw new Error('Wallet connection rejected.');
     }
 
     return accounts[0];
@@ -148,7 +148,7 @@ export async function saveVerdictToChain(
 ): Promise<SaveResult> {
     await connectWallet();
 
-    if (!window.ethereum) throw new Error('MetaMask bulunamdı.');
+    if (!window.ethereum) throw new Error('MetaMask not found.');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const provider = new ethers.BrowserProvider(window.ethereum as any);
     const signer = await provider.getSigner();
@@ -175,7 +175,7 @@ export async function saveVerdictToChain(
 
     // Wait for 1 on-chain confirmation
     const receipt = await tx.wait(1);
-    if (!receipt) throw new Error('İşlem onayı alınamadı.');
+    if (!receipt) throw new Error('Transaction confirmation not received.');
 
     // Parse VerdictSaved event to get on-chain id
     const iface = new ethers.Interface(CONTRACT_ABI as ethers.InterfaceAbi);
@@ -210,18 +210,50 @@ export interface VerdictRecord {
     formattedTime: string;
 }
 
-const MONAD_RPC = 'https://testnet-rpc.monad.xyz/';
+// Try these RPC endpoints in order until one responds
+const MONAD_RPCS = [
+    'https://testnet-rpc.monad.xyz/',
+    'https://rpc.testnet.monad.xyz/',
+];
 const HISTORY_LIMIT = 10;
+
+async function getProvider(): Promise<ethers.JsonRpcProvider> {
+    for (const url of MONAD_RPCS) {
+        try {
+            const p = new ethers.JsonRpcProvider(url);
+            // Quick liveness check (5 s timeout)
+            const network = await Promise.race([
+                p.getNetwork(),
+                new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error('timeout')), 5000)
+                ),
+            ]);
+            console.log(`[AgentJury] Connected to RPC: ${url} (chain ${(network as ethers.Network).chainId})`);
+            return p;
+        } catch {
+            console.warn(`[AgentJury] RPC ${url} unreachable, trying next…`);
+        }
+    }
+    throw new Error('Monad testnet RPC is not responding. Please try again in a few minutes.');
+}
 
 /**
  * Fetches the last HISTORY_LIMIT verdicts from the contract without requiring
- * a wallet — uses a read-only JsonRpcProvider.
+ * a wallet — uses a read-only JsonRpcProvider with automatic fallback.
  */
 export async function getVerdictHistory(): Promise<VerdictRecord[]> {
-    const provider = new ethers.JsonRpcProvider(MONAD_RPC);
+    const provider = await getProvider();
     const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
 
-    const count: bigint = await contract.getVerdictCount();
+    let count: bigint;
+    try {
+        count = await contract.getVerdictCount();
+    } catch (err) {
+        throw new Error(
+            `Failed to read contract count: ${err instanceof Error ? err.message.split('(')[0].trim() : 'unknown error'}`
+        );
+    }
+
     if (count === BigInt(0)) return [];
 
     const start = count > BigInt(HISTORY_LIMIT) ? count - BigInt(HISTORY_LIMIT) : BigInt(0);
@@ -230,7 +262,7 @@ export async function getVerdictHistory(): Promise<VerdictRecord[]> {
         ids.push(i);
     }
 
-    const records = await Promise.all(
+    const results = await Promise.allSettled(
         ids.map(async (id) => {
             const v = await contract.getVerdict(id);
             const ts = Number(v.timestamp) * 1000;
@@ -252,6 +284,8 @@ export async function getVerdictHistory(): Promise<VerdictRecord[]> {
         }),
     );
 
-    return records;
+    // Return only successfully fetched verdicts — skip any that errored
+    return results
+        .filter((r): r is PromiseFulfilledResult<VerdictRecord> => r.status === 'fulfilled')
+        .map((r) => r.value);
 }
-

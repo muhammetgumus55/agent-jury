@@ -15,62 +15,26 @@ export interface AgentConfig {
     name: string;
     role: string;
     Icon: LucideIcon;
-    /** Tailwind color token, e.g. "blue", "yellow", "red" */
     color: 'blue' | 'yellow' | 'red';
 }
 
 interface AgentCardProps {
     config: AgentConfig;
     data: AgentCardData;
-    /** Stagger animation index */
     index?: number;
+    loading?: boolean;
 }
 
-/* ─── Color maps ─────────────────────────────────────────────────── */
-const COLOR = {
-    blue: {
-        gradient: 'from-blue-950/80 via-blue-900/40 to-blue-950/80',
-        border: 'border-blue-500/25',
-        iconBg: 'bg-blue-500/15',
-        iconText: 'text-blue-400',
-        glow: 'hover:shadow-blue-500/20',
-        bar: 'from-blue-500 to-cyan-400',
-        barBg: 'bg-blue-950/60',
-        badge: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-    },
-    yellow: {
-        gradient: 'from-yellow-950/80 via-amber-900/40 to-yellow-950/80',
-        border: 'border-yellow-500/25',
-        iconBg: 'bg-yellow-500/15',
-        iconText: 'text-yellow-400',
-        glow: 'hover:shadow-yellow-500/20',
-        bar: 'from-yellow-500 to-amber-400',
-        barBg: 'bg-yellow-950/60',
-        badge: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
-    },
-    red: {
-        gradient: 'from-red-950/80 via-red-900/40 to-red-950/80',
-        border: 'border-red-500/25',
-        iconBg: 'bg-red-500/15',
-        iconText: 'text-red-400',
-        glow: 'hover:shadow-red-500/20',
-        bar: 'from-red-500 to-rose-400',
-        barBg: 'bg-red-950/60',
-        badge: 'bg-red-500/15 text-red-300 border-red-500/30',
-    },
-} as const;
-
-/* ─── Score ring helper ──────────────────────────────────────────── */
+/* ─── Score label ────────────────────────────────────────────────── */
 function getScoreLabel(score: number): string {
     if (score >= 80) return 'Excellent';
     if (score >= 65) return 'Good';
     if (score >= 45) return 'Fair';
-    return 'Risky';
+    return 'Poor';
 }
 
 /* ─── AgentCard ─────────────────────────────────────────────────── */
-export function AgentCard({ config, data, index = 0 }: AgentCardProps) {
-    const c = COLOR[config.color];
+export function AgentCard({ config, data, index = 0, loading = false }: AgentCardProps) {
     const { Icon } = config;
     const visiblePros = data.pros.slice(0, 2);
     const visibleCons = data.cons.slice(0, 2);
@@ -79,42 +43,28 @@ export function AgentCard({ config, data, index = 0 }: AgentCardProps) {
         <article
             className={cn(
                 'relative rounded-2xl p-5 flex flex-col gap-4',
-                'bg-gradient-to-br',
-                c.gradient,
-                'border',
-                c.border,
-                'backdrop-blur-xl',
+                'bg-[#111111] border border-gray-800',
                 'transition-all duration-300',
-                'hover:shadow-xl',
-                c.glow,
-                'hover:-translate-y-1',
-                'animate-[fadeSlideUp_0.4s_ease_both]'
+                'hover:shadow-xl hover:shadow-white/5 hover:-translate-y-1',
+                loading && 'border-pulse',
+                'animate-[fadeSlideUp_0.4s_ease_both]',
             )}
             style={{ animationDelay: `${index * 120}ms` }}
         >
+            {/* Top accent line */}
+            <div className="absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
             {/* ── Header ── */}
             <div className="flex items-center gap-3">
-                <div
-                    className={cn(
-                        'flex items-center justify-center w-10 h-10 rounded-xl shrink-0',
-                        c.iconBg
-                    )}
-                >
-                    <Icon className={cn('w-5 h-5', c.iconText)} />
+                <div className="flex items-center justify-center w-10 h-10 rounded-xl shrink-0 bg-white/5 border border-white/10">
+                    <Icon className="w-5 h-5 text-white" />
                 </div>
                 <div className="min-w-0">
-                    <h3 className="text-sm font-bold text-white leading-tight">
-                        {config.name}
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">{config.role}</p>
+                    <h3 className="text-sm font-bold text-white leading-tight">{config.name}</h3>
+                    <p className="text-xs text-gray-600 mt-0.5">{config.role}</p>
                 </div>
                 {/* Score badge */}
-                <span
-                    className={cn(
-                        'ml-auto shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full border',
-                        c.badge
-                    )}
-                >
+                <span className="ml-auto shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-700 text-gray-400 bg-black/40">
                     {getScoreLabel(data.score)}
                 </span>
             </div>
@@ -122,20 +72,19 @@ export function AgentCard({ config, data, index = 0 }: AgentCardProps) {
             {/* ── Score display ── */}
             <div className="flex flex-col gap-2">
                 <div className="flex items-baseline justify-between">
-                    <span className="text-4xl font-black text-white tabular-nums">
-                        {data.score}
-                    </span>
-                    <span className="text-sm text-slate-500 font-medium">/ 100</span>
+                    <div className="flex items-baseline gap-1.5 bg-black rounded-xl px-3 py-1.5">
+                        <span className="text-5xl font-extrabold text-white tabular-nums leading-none">
+                            {data.score}
+                        </span>
+                        <span className="text-sm text-gray-600 font-medium">/100</span>
+                    </div>
                 </div>
 
-                {/* Progress bar */}
-                <div className={cn('w-full h-2 rounded-full overflow-hidden', c.barBg)}>
+                {/* Progress bar — monochrome */}
+                <div className="w-full h-1.5 rounded-full overflow-hidden bg-white/5">
                     <div
-                        className={cn(
-                            'h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out',
-                            c.bar
-                        )}
-                        style={{ width: `${data.score}%` }}
+                        className="h-full rounded-full bg-white transition-all duration-700 ease-out"
+                        style={{ width: `${data.score}%`, opacity: data.score >= 50 ? 0.85 : 0.35 }}
                         role="progressbar"
                         aria-valuenow={data.score}
                         aria-valuemin={0}
@@ -150,13 +99,11 @@ export function AgentCard({ config, data, index = 0 }: AgentCardProps) {
             {/* ── Pros ── */}
             {visiblePros.length > 0 && (
                 <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                        Pros
-                    </p>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Pros</p>
                     <ul className="space-y-1.5">
                         {visiblePros.map((pro) => (
-                            <li key={pro} className="flex items-start gap-2 text-xs text-slate-300">
-                                <span className="mt-px text-emerald-400 shrink-0">✓</span>
+                            <li key={pro} className="flex items-start gap-2 text-xs text-gray-400">
+                                <span className="mt-px text-white/60 shrink-0">+</span>
                                 {pro}
                             </li>
                         ))}
@@ -167,13 +114,11 @@ export function AgentCard({ config, data, index = 0 }: AgentCardProps) {
             {/* ── Cons ── */}
             {visibleCons.length > 0 && (
                 <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                        Cons
-                    </p>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Cons</p>
                     <ul className="space-y-1.5">
                         {visibleCons.map((con) => (
-                            <li key={con} className="flex items-start gap-2 text-xs text-slate-300">
-                                <span className="mt-px text-red-400 shrink-0">✗</span>
+                            <li key={con} className="flex items-start gap-2 text-xs text-gray-400">
+                                <span className="mt-px text-white/30 shrink-0">−</span>
                                 {con}
                             </li>
                         ))}

@@ -24,6 +24,7 @@ interface EvaluateResponse {
 /* ─── Config ─────────────────────────────────────────────────────── */
 const MODEL = 'openai/gpt-4o-mini';
 const MAX_RETRIES = 2;
+const AGENT_TIMEOUT_MS = 30_000; // 30 seconds per agent
 
 /* ─── Agent prompts ──────────────────────────────────────────────── */
 const AGENT_PROMPTS = {
@@ -211,6 +212,16 @@ function deriveVerdict(score: number): Verdict {
     return 'Reject - Major Issues';
 }
 
+/** Reject after `ms` milliseconds with a timeout error. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+        ),
+    ]);
+}
+
 /* ─── Single agent call with retry ──────────────────────────────── */
 async function runAgent(
     client: OpenAI,
@@ -237,9 +248,6 @@ async function runAgent(
         // Retry on rate-limit with exponential backoff
         if (isRateLimitError(err) && attempt <= MAX_RETRIES) {
             const delaySec = 10 * attempt; // 10s, 20s
-            console.warn(
-                `[Agent Jury] ${agentKey}: rate-limit on attempt ${attempt}/${MAX_RETRIES}. Retrying in ${delaySec}s…`
-            );
             await sleep(delaySec * 1000);
             return runAgent(client, agentKey, caseText, attempt + 1);
         }
@@ -252,7 +260,18 @@ async function runAgent(
     }
 }
 
+/* ─── Fallback result for a failed agent ────────────────────────── */
+function fallbackResult(agentKey: string): AgentResult {
+    return {
+        score: 50,
+        pros: [],
+        cons: [`${agentKey} agent could not complete evaluation.`],
+        questions: [],
+    };
+}
+
 /* ─── Route handler ──────────────────────────────────────────────── */
+// Supported browsers: Chrome/Edge (primary), Firefox, Safari. IE11 not supported.
 export async function POST(request: NextRequest) {
     // Validate input
     let caseText: string;
@@ -260,16 +279,22 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         caseText = body?.caseText;
         if (!caseText || typeof caseText !== 'string' || !caseText.trim()) {
-            return NextResponse.json({ error: 'caseText eksik veya boş.' }, { status: 400 });
+            return NextResponse.json(
+                { error: 'Missing or empty caseText field.' },
+                { status: 400 }
+            );
         }
     } catch {
-        return NextResponse.json({ error: 'Geçersiz JSON gövdesi.' }, { status: 400 });
+        return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
     }
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
         return NextResponse.json(
-            { error: 'OPENROUTER_API_KEY environment variable tanımlanmamış.' },
+            {
+                error: 'API key not configured.',
+                details: 'Set OPENROUTER_API_KEY in your .env.local file. See README for setup instructions.',
+            },
             { status: 500 }
         );
     }
@@ -284,17 +309,39 @@ export async function POST(request: NextRequest) {
     });
 
     try {
-        console.log('[Agent Jury] Running 3 agents in parallel via OpenRouter…');
-
-        const [feasibility, innovation, risk] = await Promise.all([
-            runAgent(client, 'feasibility', caseText),
-            runAgent(client, 'innovation', caseText),
-            runAgent(client, 'risk', caseText),
+        // Run all three agents in parallel, each with a 30-second timeout.
+        // allSettled ensures one agent failure doesn't abort the others.
+        const [feasibilityResult, innovationResult, riskResult] = await Promise.allSettled([
+            withTimeout(runAgent(client, 'feasibility', caseText), AGENT_TIMEOUT_MS, 'Feasibility agent'),
+            withTimeout(runAgent(client, 'innovation', caseText), AGENT_TIMEOUT_MS, 'Innovation agent'),
+            withTimeout(runAgent(client, 'risk', caseText), AGENT_TIMEOUT_MS, 'Risk agent'),
         ]);
 
-        const finalScore = computeFinalScore(feasibility.score, innovation.score, risk.score);
+        // If all three agents failed, surface a clear error
+        const allFailed = [feasibilityResult, innovationResult, riskResult].every(
+            (r) => r.status === 'rejected'
+        );
+        if (allFailed) {
+            const firstError = (feasibilityResult as PromiseRejectedResult).reason;
+            const message = firstError instanceof Error ? firstError.message : 'All agents failed.';
+            return NextResponse.json({ error: 'Agent evaluation failed.', details: message }, { status: 502 });
+        }
 
-        console.log(`[Agent Jury] Done. Scores: F=${feasibility.score} I=${innovation.score} R=${risk.score} → Final=${finalScore} (${deriveVerdict(finalScore)})`);
+        // Extract values — fall back gracefully for any individual agent that failed
+        const feasibility =
+            feasibilityResult.status === 'fulfilled'
+                ? feasibilityResult.value
+                : fallbackResult('Feasibility');
+        const innovation =
+            innovationResult.status === 'fulfilled'
+                ? innovationResult.value
+                : fallbackResult('Innovation');
+        const risk =
+            riskResult.status === 'fulfilled'
+                ? riskResult.value
+                : fallbackResult('Risk');
+
+        const finalScore = computeFinalScore(feasibility.score, innovation.score, risk.score);
 
         const result: EvaluateResponse = {
             agents: { feasibility, innovation, risk },
@@ -305,20 +352,20 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(result, { status: 200 });
 
     } catch (err: unknown) {
-        console.error('[/api/evaluate] Error:', err);
+        console.error('[/api/evaluate] Unexpected error:', err);
 
         let userMessage: string;
         let httpStatus = 500;
 
         if (isRateLimitError(err)) {
-            userMessage = 'OpenRouter rate limiti aşıldı. Lütfen bir süre bekleyip tekrar deneyin.';
+            userMessage = 'OpenRouter rate limit exceeded. Please wait a moment and try again.';
             httpStatus = 429;
         } else if (err instanceof SyntaxError) {
-            userMessage = 'Model geçersiz JSON döndürdü. Lütfen tekrar deneyin.';
+            userMessage = 'Model returned invalid JSON. Please try again.';
         } else if (err instanceof Error) {
             userMessage = err.message;
         } else {
-            userMessage = 'Beklenmeyen bir hata oluştu.';
+            userMessage = 'An unexpected error occurred.';
         }
 
         return NextResponse.json({ error: userMessage }, { status: httpStatus });

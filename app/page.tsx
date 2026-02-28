@@ -41,25 +41,12 @@ function BackgroundBlobs() {
   return (
     <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
       <div
-        className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full opacity-30"
-        style={{
-          background: 'radial-gradient(circle at center, #7c3aed 0%, transparent 70%)',
-          filter: 'blur(60px)',
-        }}
+        className="absolute -top-40 -left-40 w-[700px] h-[700px] rounded-full opacity-[0.06]"
+        style={{ background: 'radial-gradient(circle at center, #ffffff 0%, transparent 70%)', filter: 'blur(80px)' }}
       />
       <div
-        className="absolute -bottom-40 -right-40 w-[700px] h-[700px] rounded-full opacity-20"
-        style={{
-          background: 'radial-gradient(circle at center, #2563eb 0%, transparent 70%)',
-          filter: 'blur(80px)',
-        }}
-      />
-      <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full opacity-10"
-        style={{
-          background: 'radial-gradient(circle at center, #818cf8 0%, transparent 70%)',
-          filter: 'blur(100px)',
-        }}
+        className="absolute -bottom-40 -right-40 w-[800px] h-[800px] rounded-full opacity-[0.04]"
+        style={{ background: 'radial-gradient(circle at center, #aaaaaa 0%, transparent 70%)', filter: 'blur(100px)' }}
       />
     </div>
   );
@@ -95,11 +82,11 @@ function Hero() {
         </span>
       </h1>
 
-      {/* Divider with icon */}
+      {/* Divider */}
       <div className="flex items-center justify-center gap-3 mb-6">
-        <div className="h-px w-16 bg-gradient-to-r from-transparent to-purple-500/40" />
-        <span className="text-purple-500/60 text-lg">⚖️</span>
-        <div className="h-px w-16 bg-gradient-to-l from-transparent to-purple-500/40" />
+        <div className="h-px w-16 bg-gradient-to-r from-transparent to-white/20" />
+        <span className="text-white/30 text-lg">⚖️</span>
+        <div className="h-px w-16 bg-gradient-to-l from-transparent to-white/20" />
       </div>
 
       {/* Subtitle */}
@@ -156,8 +143,8 @@ function CaseInput({ value, onChange, onSubmit, disabled }: CaseInputProps) {
         )}
       >
         <div className="flex items-center gap-3 mb-4">
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/30">
-            <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10">
+            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
@@ -176,9 +163,9 @@ function CaseInput({ value, onChange, onSubmit, disabled }: CaseInputProps) {
           disabled={disabled}
           className={cn(
             'w-full resize-none rounded-xl px-4 py-3 text-sm leading-relaxed',
-            'bg-black/30 border text-slate-200 placeholder-slate-600',
-            'transition-all duration-200 focus:border-purple-500/50',
-            tooShort ? 'border-orange-500/50' : 'border-white/10',
+            'bg-black border text-gray-200 placeholder-gray-700',
+            'transition-all duration-200 focus:border-white/30',
+            tooShort ? 'border-gray-600' : 'border-gray-800',
             disabled && 'opacity-50 cursor-not-allowed'
           )}
         />
@@ -186,16 +173,16 @@ function CaseInput({ value, onChange, onSubmit, disabled }: CaseInputProps) {
         {/* Validation hint */}
         <div className="flex items-center justify-between mt-2 min-h-[20px]">
           {tooShort ? (
-            <p className="text-xs text-orange-400 flex items-center gap-1">
+            <p className="text-xs text-gray-500 flex items-center gap-1">
               <AlertCircle className="w-3 h-3" />
-              En az {MIN_CHARS} karakter gerekli ({MIN_CHARS - trimmed.length} karakter daha)
+              At least {MIN_CHARS} characters required ({MIN_CHARS - trimmed.length} more to go)
             </p>
           ) : (
             <span />
           )}
           <span className={cn(
             'text-xs tabular-nums transition-colors',
-            charCount > maxChars * 0.9 ? 'text-orange-400' : 'text-slate-600'
+            charCount > maxChars * 0.9 ? 'text-gray-400' : 'text-gray-700'
           )}>
             {charCount.toLocaleString()} / {maxChars.toLocaleString()}
           </span>
@@ -209,10 +196,10 @@ function CaseInput({ value, onChange, onSubmit, disabled }: CaseInputProps) {
             aria-disabled={!isValid || disabled}
             className={cn(
               'relative inline-flex items-center gap-2 px-6 py-2.5 rounded-xl',
-              'text-sm font-semibold tracking-wide transition-all duration-200',
+              'text-sm font-bold tracking-wide transition-all duration-200',
               !isValid || disabled
-                ? 'bg-white/5 text-slate-600 cursor-not-allowed border border-white/5'
-                : 'text-white cursor-pointer bg-gradient-to-r from-purple-600 via-violet-600 to-blue-600 hover:from-purple-500 hover:via-violet-500 hover:to-blue-500 hover:shadow-lg hover:shadow-purple-500/30 hover:-translate-y-0.5 active:translate-y-0 border border-white/10'
+                ? 'bg-white/5 text-gray-700 cursor-not-allowed border border-white/5'
+                : 'bg-white text-black cursor-pointer hover:bg-gray-100 hover:shadow-lg hover:shadow-white/10 hover:-translate-y-0.5 active:translate-y-0 border border-white/10'
             )}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -226,42 +213,6 @@ function CaseInput({ value, onChange, onSubmit, disabled }: CaseInputProps) {
   );
 }
 
-
-/* ─── Loading state ───────────────────────────────────────────────── */
-function EvaluationLoading() {
-  return (
-    <section className="w-full max-w-6xl mx-auto text-center py-16">
-      <div className="flex flex-col items-center gap-6">
-        {/* Spinner ring */}
-        <div className="relative w-20 h-20">
-          <div className="absolute inset-0 rounded-full border-4 border-white/5" />
-          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-500 border-r-blue-500 animate-spin" />
-          <div className="absolute inset-2 rounded-full border-4 border-transparent border-t-violet-400 animate-spin [animation-direction:reverse] [animation-duration:0.8s]" />
-        </div>
-
-        <div>
-          <p className="text-xl font-bold text-white mb-1">Agents Deliberating…</p>
-          <p className="text-sm text-slate-500">Your idea is being evaluated by the jury</p>
-        </div>
-
-        {/* Agent status pills */}
-        <div className="flex flex-wrap justify-center gap-3 mt-2">
-          {AGENTS.map((agent, i) => (
-            <div
-              key={agent.id}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass border border-white/10 text-xs text-slate-400"
-              style={{ animationDelay: `${i * 200}ms` }}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" style={{ animationDelay: `${i * 300}ms` }} />
-              <agent.Icon className="w-3 h-3" />
-              {agent.name}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 /* ─── Empty state ─────────────────────────────────────────────────── */
 function AgentCardsEmptyState() {
@@ -454,12 +405,12 @@ function SaveOnChainButton({ caseText, results, finalScore, shortVerdict }: Save
       setTxHash(hash);
       setSaveStatus('success');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata';
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       // User rejected the tx
       if (msg.includes('rejected') || msg.includes('denied') || msg.includes('user rejected')) {
-        setSaveError('İşlem reddedildi.');
+        setSaveError('Transaction rejected.');
       } else if (msg.includes('insufficient') || msg.includes('Insufficient')) {
-        setSaveError('Yetersiz MON bakiyesi.');
+        setSaveError('Insufficient MON balance.');
       } else {
         setSaveError(msg);
       }
@@ -472,7 +423,7 @@ function SaveOnChainButton({ caseText, results, finalScore, shortVerdict }: Save
       <div className="flex-shrink-0 flex flex-col items-center gap-2">
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-xs font-semibold">
           <CheckCircle className="w-4 h-4" />
-          Zincire kaydedildi!
+          Saved on-chain!
         </div>
         <a
           href={`https://testnet.monadexplorer.com/tx/${txHash}`}
@@ -512,7 +463,7 @@ function SaveOnChainButton({ caseText, results, finalScore, shortVerdict }: Save
           </svg>
         )}
         <span className="text-xs font-semibold">
-          {saveStatus === 'saving' ? 'Kaydediliyor…' : 'Save Verdict On-Chain'}
+          {saveStatus === 'saving' ? 'Saving…' : 'Save Verdict On-Chain'}
         </span>
         <span className="text-[10px] opacity-60">Monad Testnet</span>
       </button>
@@ -659,8 +610,7 @@ export default function HomePage() {
       setResults(data.agents);
       setStatus('deliberating'); // show deliberation before revealing results
     } catch (err) {
-      console.error('[Agent Jury] Evaluation failed:', err);
-      setErrorMsg(err instanceof Error ? err.message : 'Beklenmeyen bir hata oluştu.');
+      setErrorMsg(err instanceof Error ? err.message : 'An unexpected error occurred.');
       setStatus('error');
     }
   }
@@ -713,13 +663,13 @@ export default function HomePage() {
           <div className="w-full max-w-3xl mx-auto mb-8 px-4 py-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-sm flex items-start gap-3 animate-[fadeSlideUp_0.3s_ease_both]">
             <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold mb-0.5">Değerlendirme başarısız</p>
+              <p className="font-semibold mb-0.5">Evaluation failed</p>
               <p className="text-red-400/70">{errorMsg}</p>
               <button
                 onClick={handleReset}
                 className="mt-2 text-xs text-red-400 underline hover:text-red-300"
               >
-                Tekrar dene
+                Try again
               </button>
             </div>
           </div>

@@ -306,7 +306,7 @@ export default function HistoryPage() {
             const data = await getVerdictHistory();
             setVerdicts(data);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Bilinmeyen hata');
+            setError(err instanceof Error ? err.message : 'Unknown error');
         } finally {
             setLoading(false);
         }

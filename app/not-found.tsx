@@ -26,7 +26,7 @@ export default function NotFound() {
                     Page not found
                 </h1>
                 <p className="text-slate-500 text-sm mb-10 max-w-xs mx-auto">
-                    The jury couldn't find this page. Maybe it was rejected during evaluation.
+                    The jury couldn&apos;t find this page. Maybe it was rejected during evaluation.
                 </p>
 
                 <div className="flex items-center justify-center gap-3">
