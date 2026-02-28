@@ -1,0 +1,6 @@
+# Foundry — smart contract tooling
+out/
+cache/
+
+# Deployment secrets — NEVER commit
+.env
