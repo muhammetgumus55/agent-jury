@@ -350,16 +350,16 @@ function FinalVerdict({ score, caseText, results, shortVerdict }: FinalVerdictPr
             </h2>
           </div>
           <p className="text-sm text-slate-400 max-w-md">
-            Based on a weighted evaluation across feasibility (45%), innovation
-            (35%), and risk (20%).
+            Based on a weighted evaluation across innovation (50%), feasibility
+            (25%), and risk (25%).
           </p>
 
           {/* Weight breakdown */}
           <div className="flex flex-wrap gap-2 mt-4">
             {[
-              { label: 'Feasibility', weight: '45%', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10' },
-              { label: 'Innovation', weight: '35%', color: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10' },
-              { label: 'Risk (inv.)', weight: '20%', color: 'text-red-400 border-red-500/30 bg-red-500/10' },
+              { label: 'Innovation', weight: '50%', color: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10' },
+              { label: 'Feasibility', weight: '25%', color: 'text-blue-400 border-blue-500/30 bg-blue-500/10' },
+              { label: 'Risk (inv.)', weight: '25%', color: 'text-red-400 border-red-500/30 bg-red-500/10' },
             ].map((w) => (
               <span
                 key={w.label}

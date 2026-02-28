@@ -62,7 +62,7 @@ const AGENT_META = [
         bar: 'bg-blue-500',
         border: 'border-blue-500/20',
         bg: 'bg-blue-500/5',
-        weight: '45%',
+        weight: '25%',
         description: 'How achievable is this idea within hackathon constraints?',
     },
     {
@@ -73,7 +73,7 @@ const AGENT_META = [
         bar: 'bg-yellow-500',
         border: 'border-yellow-500/20',
         bg: 'bg-yellow-500/5',
-        weight: '35%',
+        weight: '50%',
         description: 'How novel and differentiated is this idea?',
     },
     {
@@ -84,7 +84,7 @@ const AGENT_META = [
         bar: 'bg-red-500',
         border: 'border-red-500/20',
         bg: 'bg-red-500/5',
-        weight: '20% (inverted)',
+        weight: '25% (inverted)',
         description: 'Technical / market risk (higher = riskier).',
     },
 ];
@@ -219,11 +219,11 @@ function VerdictCard({ v, index }: { v: VerdictRecord; index: number }) {
                     {/* Weight formula */}
                     <div className="flex flex-wrap items-center gap-2 mb-4 text-[10px] text-slate-600">
                         <span>Final =</span>
-                        <span className="text-blue-400">F×0.45</span>
+                        <span className="text-yellow-400">I×0.50</span>
                         <span>+</span>
-                        <span className="text-yellow-400">I×0.35</span>
+                        <span className="text-blue-400">F×0.25</span>
                         <span>+</span>
-                        <span className="text-red-400">(100−R)×0.20</span>
+                        <span className="text-red-400">(100−R)×0.25</span>
                         <span>=</span>
                         <span className={cn('font-black text-sm', scoreColor(v.finalScore))}>{v.finalScore}</span>
                     </div>
