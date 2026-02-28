@@ -34,7 +34,7 @@ export default function Footer() {
                         History
                     </Link>
                     <a
-                        href="https://github.com"
+                        href="https://github.com/muhammetgumus55/agent-jury"
                         target="_blank"
                         rel="noreferrer"
                         className="text-xs text-slate-500 hover:text-slate-300 transition-colors duration-150 flex items-center gap-1"

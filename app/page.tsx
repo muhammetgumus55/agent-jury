@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { AgentCard, AgentConfig, AgentCardData } from '@/components/AgentCard';
 import { saveVerdictToChain, EvalResults } from '@/lib/contract';
 import Footer from '@/components/Footer';
+import DeliberationChat, { DeliberationResults } from '@/components/DeliberationChat';
 
 /* ─── Agent definitions ───────────────────────────────────────────── */
 const AGENTS: AgentConfig[] = [
@@ -64,24 +65,67 @@ function BackgroundBlobs() {
   );
 }
 
-/* ─── Hero ────────────────────────────────────────────────────────── */
+/* ─── Hero ────────/* ─── Hero ─────────────────────────────────────────────── */
 function Hero() {
   return (
-    <header className="text-center mb-12 pt-4">
-      <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-6 rounded-full text-xs font-medium tracking-wider uppercase glass border border-purple-500/30 text-purple-300">
-        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-        AI-Powered Evaluation
+    <header className="text-center mb-14 pt-6">
+      {/* Top label */}
+      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 mb-8 rounded-full text-[11px] font-semibold tracking-[0.18em] uppercase border border-purple-500/25 text-purple-300/80"
+        style={{ background: 'rgba(139,92,246,0.08)' }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse flex-shrink-0" />
+        Monad Blitz Hackathon
       </div>
-      <h1 className="text-6xl md:text-7xl font-black mb-4 leading-none tracking-tight">
-        <span className="gradient-text">Agent</span>{' '}
-        <span className="text-white">Jury</span>
-      </h1>
-      <p className="text-lg md:text-xl text-slate-400 max-w-xl mx-auto font-light leading-relaxed">
-        AI agents evaluate your idea —{' '}
-        <span className="text-slate-300 font-medium">
-          debating, scoring, and delivering a final verdict.
+
+      {/* Main title */}
+      <h1 className="text-7xl md:text-8xl font-black mb-5 leading-[0.9] tracking-tight">
+        <span
+          className="block"
+          style={{
+            background: 'linear-gradient(135deg, #c4b5fd 0%, #818cf8 40%, #60a5fa 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          Agent
         </span>
+        <span className="block text-white drop-shadow-[0_2px_24px_rgba(139,92,246,0.4)]">
+          Jury
+        </span>
+      </h1>
+
+      {/* Divider with icon */}
+      <div className="flex items-center justify-center gap-3 mb-6">
+        <div className="h-px w-16 bg-gradient-to-r from-transparent to-purple-500/40" />
+        <span className="text-purple-500/60 text-lg">⚖️</span>
+        <div className="h-px w-16 bg-gradient-to-l from-transparent to-purple-500/40" />
+      </div>
+
+      {/* Subtitle */}
+      <p className="text-base md:text-lg text-slate-400 max-w-lg mx-auto leading-relaxed mb-8">
+        Three autonomous AI agents evaluate your hackathon idea —
+        <br className="hidden sm:block" />
+        <span className="text-slate-200 font-medium"> debating, scoring, and delivering a verdict on&#8209;chain.</span>
       </p>
+
+      {/* Stat pills */}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        {[
+          { icon: '🧠', label: 'Feasibility', sub: '25% weight' },
+          { icon: '💡', label: 'Innovation', sub: '50% weight' },
+          { icon: '🛡', label: 'Risk', sub: '25% weight' },
+        ].map((s) => (
+          <div key={s.label}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/8 text-xs"
+            style={{ background: 'rgba(255,255,255,0.03)' }}
+          >
+            <span>{s.icon}</span>
+            <span className="text-white font-semibold">{s.label}</span>
+            <span className="text-slate-600">{s.sub}</span>
+          </div>
+        ))}
+      </div>
     </header>
   );
 }
@@ -577,7 +621,7 @@ function ResultsGrid({
 }
 
 /* ─── Page root ───────────────────────────────────────────────────── */
-type Status = 'idle' | 'loading' | 'done' | 'error';
+type Status = 'idle' | 'loading' | 'deliberating' | 'done' | 'error';
 
 export default function HomePage() {
   const [caseText, setCaseText] = useState('');
@@ -613,7 +657,7 @@ export default function HomePage() {
 
       // API returns { agents: { feasibility, innovation, risk }, finalScore, verdict }
       setResults(data.agents);
-      setStatus('done');
+      setStatus('deliberating'); // show deliberation before revealing results
     } catch (err) {
       console.error('[Agent Jury] Evaluation failed:', err);
       setErrorMsg(err instanceof Error ? err.message : 'Beklenmeyen bir hata oluştu.');
@@ -626,6 +670,14 @@ export default function HomePage() {
     setResults(null);
     setErrorMsg(null);
     setCaseText('');
+  }
+
+  function handleDeliberationComplete() {
+    setStatus('done');
+  }
+
+  function handleDeliberationSkip() {
+    setStatus('done');
   }
 
   const finalScore = results ? computeFinalScore(results) : 0;
@@ -653,7 +705,7 @@ export default function HomePage() {
           value={caseText}
           onChange={setCaseText}
           onSubmit={handleSubmit}
-          disabled={status === 'loading' || status === 'done'}
+          disabled={status === 'loading' || status === 'deliberating' || status === 'done'}
         />
 
         {/* Error banner */}
@@ -674,7 +726,13 @@ export default function HomePage() {
         )}
 
         {(status === 'idle' || status === 'error') && <AgentCardsEmptyState />}
-        {status === 'loading' && <EvaluationLoading />}
+        {(status === 'loading' || status === 'deliberating') && (
+          <DeliberationChat
+            results={results as DeliberationResults | null}
+            onComplete={handleDeliberationComplete}
+            onSkip={handleDeliberationSkip}
+          />
+        )}
         {status === 'done' && results && (
           <ResultsGrid results={results} finalScore={finalScore} caseText={caseText} />
         )}
