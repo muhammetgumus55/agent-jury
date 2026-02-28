@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Brain, Lightbulb, Shield, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AgentCard, AgentConfig, AgentCardData } from '@/components/AgentCard';
@@ -631,6 +632,20 @@ export default function HomePage() {
   return (
     <main className="relative min-h-screen px-4 py-16 md:py-24">
       <BackgroundBlobs />
+
+      {/* View History link — top-right corner */}
+      <div className="absolute top-5 right-5 z-20">
+        <Link
+          href="/history"
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-400 border border-white/10 glass hover:text-white hover:border-white/20 transition-all duration-200"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          View History
+        </Link>
+      </div>
+
       <div className="relative z-10 flex flex-col items-center">
         <Hero />
         <CaseInput

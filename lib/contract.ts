@@ -32,6 +32,28 @@ export const CONTRACT_ABI = [
         stateMutability: 'view',
     },
     {
+        type: 'function',
+        name: 'getVerdict',
+        inputs: [{ name: 'id', type: 'uint256' }],
+        outputs: [
+            {
+                name: '',
+                type: 'tuple',
+                components: [
+                    { name: 'caseHash', type: 'bytes32' },
+                    { name: 'feasibility', type: 'uint8' },
+                    { name: 'innovation', type: 'uint8' },
+                    { name: 'risk', type: 'uint8' },
+                    { name: 'finalScore', type: 'uint8' },
+                    { name: 'shortVerdict', type: 'string' },
+                    { name: 'submitter', type: 'address' },
+                    { name: 'timestamp', type: 'uint256' },
+                ],
+            },
+        ],
+        stateMutability: 'view',
+    },
+    {
         type: 'event',
         name: 'VerdictSaved',
         inputs: [
@@ -172,3 +194,64 @@ export async function saveVerdictToChain(
 
     return { txHash: receipt.hash, verdictId };
 }
+
+/* ─── getVerdictHistory ──────────────────────────────────────────────── */
+
+export interface VerdictRecord {
+    id: bigint;
+    caseHash: string;
+    feasibility: number;
+    innovation: number;
+    risk: number;
+    finalScore: number;
+    shortVerdict: string;
+    submitter: string;
+    timestamp: bigint;
+    formattedTime: string;
+}
+
+const MONAD_RPC = 'https://testnet-rpc.monad.xyz/';
+const HISTORY_LIMIT = 10;
+
+/**
+ * Fetches the last HISTORY_LIMIT verdicts from the contract without requiring
+ * a wallet — uses a read-only JsonRpcProvider.
+ */
+export async function getVerdictHistory(): Promise<VerdictRecord[]> {
+    const provider = new ethers.JsonRpcProvider(MONAD_RPC);
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+
+    const count: bigint = await contract.getVerdictCount();
+    if (count === BigInt(0)) return [];
+
+    const start = count > BigInt(HISTORY_LIMIT) ? count - BigInt(HISTORY_LIMIT) : BigInt(0);
+    const ids: bigint[] = [];
+    for (let i = count - BigInt(1); i >= start; i--) {
+        ids.push(i);
+    }
+
+    const records = await Promise.all(
+        ids.map(async (id) => {
+            const v = await contract.getVerdict(id);
+            const ts = Number(v.timestamp) * 1000;
+            return {
+                id,
+                caseHash: v.caseHash as string,
+                feasibility: Number(v.feasibility),
+                innovation: Number(v.innovation),
+                risk: Number(v.risk),
+                finalScore: Number(v.finalScore),
+                shortVerdict: v.shortVerdict as string,
+                submitter: v.submitter as string,
+                timestamp: v.timestamp as bigint,
+                formattedTime: new Date(ts).toLocaleString(undefined, {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                }),
+            } satisfies VerdictRecord;
+        }),
+    );
+
+    return records;
+}
+
