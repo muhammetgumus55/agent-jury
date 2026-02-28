@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Brain, Lightbulb, Shield, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AgentCard, AgentConfig, AgentCardData } from '@/components/AgentCard';
+import { saveVerdictToChain, EvalResults } from '@/lib/contract';
 
 /* ─── Agent definitions ───────────────────────────────────────────── */
 const AGENTS: AgentConfig[] = [
@@ -270,7 +271,14 @@ function computeFinalScore(results: Record<string, AgentCardData>): number {
 }
 
 /* ─── Final Verdict ───────────────────────────────────────────────── */
-function FinalVerdict({ score }: { score: number }) {
+interface FinalVerdictProps {
+  score: number;
+  caseText: string;
+  results: EvalResults;
+  shortVerdict: string;
+}
+
+function FinalVerdict({ score, caseText, results, shortVerdict }: FinalVerdictProps) {
   let Icon: typeof CheckCircle;
   let label: string;
   let iconClass: string;
@@ -366,44 +374,120 @@ function FinalVerdict({ score }: { score: number }) {
         </div>
 
         {/* Save On-Chain button */}
-        <div className="flex-shrink-0">
-          <button
-            id="save-onchain-btn"
-            disabled
-            aria-disabled="true"
-            title="On-chain saving coming soon"
-            className={cn(
-              'inline-flex flex-col items-center gap-1.5 px-6 py-4 rounded-xl',
-              'border border-emerald-500/20 bg-emerald-500/5',
-              'text-emerald-700 cursor-not-allowed select-none',
-              'transition-all duration-200'
-            )}
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z"
-              />
-            </svg>
-            <span className="text-xs font-semibold">Save Verdict On-Chain</span>
-            <span className="text-[10px] text-emerald-900/60">Coming soon</span>
-          </button>
-        </div>
+        <SaveOnChainButton
+          caseText={caseText}
+          results={results}
+          finalScore={score}
+          shortVerdict={shortVerdict}
+        />
       </div>
+    </div>
+  );
+}
+
+/* ─── SaveOnChainButton ─────────────────────────────────────────────── */
+type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
+
+interface SaveOnChainButtonProps {
+  caseText: string;
+  results: EvalResults;
+  finalScore: number;
+  shortVerdict: string;
+}
+
+function SaveOnChainButton({ caseText, results, finalScore, shortVerdict }: SaveOnChainButtonProps) {
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  async function handleSave() {
+    setSaveStatus('saving');
+    setSaveError(null);
+    try {
+      const { txHash: hash } = await saveVerdictToChain(caseText, results, finalScore, shortVerdict);
+      setTxHash(hash);
+      setSaveStatus('success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata';
+      // User rejected the tx
+      if (msg.includes('rejected') || msg.includes('denied') || msg.includes('user rejected')) {
+        setSaveError('İşlem reddedildi.');
+      } else if (msg.includes('insufficient') || msg.includes('Insufficient')) {
+        setSaveError('Yetersiz MON bakiyesi.');
+      } else {
+        setSaveError(msg);
+      }
+      setSaveStatus('error');
+    }
+  }
+
+  if (saveStatus === 'success' && txHash) {
+    return (
+      <div className="flex-shrink-0 flex flex-col items-center gap-2">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-xs font-semibold">
+          <CheckCircle className="w-4 h-4" />
+          Zincire kaydedildi!
+        </div>
+        <a
+          href={`https://testnet.monadexplorer.com/tx/${txHash}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[10px] text-emerald-600 hover:text-emerald-400 underline font-mono truncate max-w-[160px]"
+          title={txHash}
+        >
+          {txHash.slice(0, 10)}…{txHash.slice(-8)}
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-shrink-0 flex flex-col items-center gap-1.5">
+      <button
+        id="save-onchain-btn"
+        onClick={handleSave}
+        disabled={saveStatus === 'saving'}
+        className={cn(
+          'inline-flex flex-col items-center gap-1.5 px-6 py-4 rounded-xl',
+          'border transition-all duration-200',
+          saveStatus === 'saving'
+            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 cursor-wait'
+            : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/60 cursor-pointer'
+        )}
+      >
+        {saveStatus === 'saving' ? (
+          <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+        ) : (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        )}
+        <span className="text-xs font-semibold">
+          {saveStatus === 'saving' ? 'Kaydediliyor…' : 'Save Verdict On-Chain'}
+        </span>
+        <span className="text-[10px] opacity-60">Monad Testnet</span>
+      </button>
+      {saveStatus === 'error' && saveError && (
+        <p className="text-[10px] text-red-400 max-w-[160px] text-center">{saveError}</p>
+      )}
     </div>
   );
 }
 
 /* ─── Results grid (staggered reveal) ─────────────────────────────────── */
 // revealed: 0=none, 1=feasibility, 2=innovation, 3=risk, 4=verdict
-function ResultsGrid({ results, finalScore }: { results: Record<string, AgentCardData>; finalScore: number }) {
+function ResultsGrid({
+  results,
+  finalScore,
+  caseText,
+}: {
+  results: Record<string, AgentCardData>;
+  finalScore: number;
+  caseText: string;
+}) {
   const [revealed, setRevealed] = useState(0);
 
   useEffect(() => {
@@ -458,7 +542,17 @@ function ResultsGrid({ results, finalScore }: { results: Record<string, AgentCar
           revealed >= 4 ? 'opacity-100' : 'opacity-0 translate-y-4 pointer-events-none'
         )}
       >
-        {revealed >= 4 && <FinalVerdict score={finalScore} />}
+        {revealed >= 4 && (
+          <FinalVerdict
+            score={finalScore}
+            caseText={caseText}
+            results={results as unknown as EvalResults}
+            shortVerdict={
+              finalScore >= 70 ? 'Ship MVP' :
+                finalScore >= 50 ? 'Iterate First' : 'Reject - Major Issues'
+            }
+          />
+        )}
       </div>
 
       {/* Reset button */}
@@ -566,7 +660,7 @@ export default function HomePage() {
         {(status === 'idle' || status === 'error') && <AgentCardsEmptyState />}
         {status === 'loading' && <EvaluationLoading />}
         {status === 'done' && results && (
-          <ResultsGrid results={results} finalScore={finalScore} />
+          <ResultsGrid results={results} finalScore={finalScore} caseText={caseText} />
         )}
       </div>
     </main>

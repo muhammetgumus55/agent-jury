@@ -1,19 +1,176 @@
-
-╭----------+----------------------------------------------------------------------------------+--------------------------------------------------------------------╮
-| Type     | Signature                                                                        | Selector                                                           |
-+==================================================================================================================================================================+
-| event    | VerdictSaved(uint256,uint8)                                                      | 0xeb12b8c51a43f796e19ada09015b872973d3d55c23c1ff33e9398dd52ca975cc |
-|----------+----------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error    | EmptyVerdict()                                                                   | 0x9266bca4                                                         |
-|----------+----------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error    | IndexOutOfBounds(uint256,uint256)                                                | 0x63a056dd                                                         |
-|----------+----------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error    | InvalidScore(string,uint8)                                                       | 0xbe6587a3                                                         |
-|----------+----------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function | getVerdict(uint256) view returns (AgentJury.Verdict)                             | 0x33f3e74b                                                         |
-|----------+----------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function | getVerdictCount() view returns (uint256)                                         | 0x2a6e12f1                                                         |
-|----------+----------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function | saveVerdict(bytes32,uint8,uint8,uint8,uint8,string) nonpayable returns (uint256) | 0x395688d8                                                         |
-╰----------+----------------------------------------------------------------------------------+--------------------------------------------------------------------╯
-
+[
+  {
+    "type": "function",
+    "name": "getVerdict",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct AgentJury.Verdict",
+        "components": [
+          {
+            "name": "caseHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "feasibility",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "innovation",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "risk",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "finalScore",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "shortVerdict",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "submitter",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "timestamp",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getVerdictCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "saveVerdict",
+    "inputs": [
+      {
+        "name": "caseHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "feasibility",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "innovation",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "risk",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "finalScore",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "shortVerdict",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "VerdictSaved",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "finalScore",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "EmptyVerdict",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "IndexOutOfBounds",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "length",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidScore",
+    "inputs": [
+      {
+        "name": "field",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "value",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  }
+]
