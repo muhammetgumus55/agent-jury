@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Brain, Lightbulb, Shield, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AgentCard, AgentConfig, AgentCardData } from '@/components/AgentCard';
@@ -83,7 +83,9 @@ function Hero() {
   );
 }
 
-/* ─── Case input ──────────────────────────────────────────────────── */
+/* ─── Case input ─────────────────────────────────────────────────── */
+const MIN_CHARS = 20;
+
 interface CaseInputProps {
   value: string;
   onChange: (v: string) => void;
@@ -92,16 +94,18 @@ interface CaseInputProps {
 }
 
 function CaseInput({ value, onChange, onSubmit, disabled }: CaseInputProps) {
-  const isEmpty = value.trim().length === 0;
+  const trimmed = value.trim();
   const charCount = value.length;
   const maxChars = 2000;
+  const tooShort = trimmed.length > 0 && trimmed.length < MIN_CHARS;
+  const isValid = trimmed.length >= MIN_CHARS;
 
   return (
     <section className="w-full max-w-3xl mx-auto mb-12">
       <div
         className={cn(
           'glass-strong rounded-2xl p-6 transition-all duration-300',
-          !isEmpty && 'animate-glow'
+          isValid && 'animate-glow'
         )}
       >
         <div className="flex items-center gap-3 mb-4">
@@ -125,25 +129,41 @@ function CaseInput({ value, onChange, onSubmit, disabled }: CaseInputProps) {
           disabled={disabled}
           className={cn(
             'w-full resize-none rounded-xl px-4 py-3 text-sm leading-relaxed',
-            'bg-black/30 border border-white/10 text-slate-200 placeholder-slate-600',
+            'bg-black/30 border text-slate-200 placeholder-slate-600',
             'transition-all duration-200 focus:border-purple-500/50',
+            tooShort ? 'border-orange-500/50' : 'border-white/10',
             disabled && 'opacity-50 cursor-not-allowed'
           )}
         />
 
-        <div className="flex items-center justify-between mt-4">
-          <span className={cn('text-xs tabular-nums transition-colors', charCount > maxChars * 0.9 ? 'text-orange-400' : 'text-slate-600')}>
+        {/* Validation hint */}
+        <div className="flex items-center justify-between mt-2 min-h-[20px]">
+          {tooShort ? (
+            <p className="text-xs text-orange-400 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />
+              En az {MIN_CHARS} karakter gerekli ({MIN_CHARS - trimmed.length} karakter daha)
+            </p>
+          ) : (
+            <span />
+          )}
+          <span className={cn(
+            'text-xs tabular-nums transition-colors',
+            charCount > maxChars * 0.9 ? 'text-orange-400' : 'text-slate-600'
+          )}>
             {charCount.toLocaleString()} / {maxChars.toLocaleString()}
           </span>
+        </div>
+
+        <div className="flex items-center justify-end mt-3">
           <button
             id="start-evaluation-btn"
             onClick={onSubmit}
-            disabled={isEmpty || disabled}
-            aria-disabled={isEmpty || disabled}
+            disabled={!isValid || disabled}
+            aria-disabled={!isValid || disabled}
             className={cn(
               'relative inline-flex items-center gap-2 px-6 py-2.5 rounded-xl',
               'text-sm font-semibold tracking-wide transition-all duration-200',
-              isEmpty || disabled
+              !isValid || disabled
                 ? 'bg-white/5 text-slate-600 cursor-not-allowed border border-white/5'
                 : 'text-white cursor-pointer bg-gradient-to-r from-purple-600 via-violet-600 to-blue-600 hover:from-purple-500 hover:via-violet-500 hover:to-blue-500 hover:shadow-lg hover:shadow-purple-500/30 hover:-translate-y-0.5 active:translate-y-0 border border-white/10'
             )}
@@ -158,6 +178,7 @@ function CaseInput({ value, onChange, onSubmit, disabled }: CaseInputProps) {
     </section>
   );
 }
+
 
 /* ─── Loading state ───────────────────────────────────────────────── */
 function EvaluationLoading() {
@@ -380,29 +401,73 @@ function FinalVerdict({ score }: { score: number }) {
   );
 }
 
-/* ─── Results grid ────────────────────────────────────────────────── */
+/* ─── Results grid (staggered reveal) ─────────────────────────────────── */
+// revealed: 0=none, 1=feasibility, 2=innovation, 3=risk, 4=verdict
 function ResultsGrid({ results, finalScore }: { results: Record<string, AgentCardData>; finalScore: number }) {
+  const [revealed, setRevealed] = useState(0);
+
+  useEffect(() => {
+    // Reset then stagger-reveal each piece
+    setRevealed(0);
+    const timers = [
+      setTimeout(() => setRevealed(1), 500),
+      setTimeout(() => setRevealed(2), 1000),
+      setTimeout(() => setRevealed(3), 1500),
+      setTimeout(() => setRevealed(4), 2000),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  const agentOrder = ['feasibility', 'innovation', 'risk'] as const;
+
   return (
     <section className="w-full max-w-6xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-widest">Evaluation</h2>
         <div className="flex-1 h-px bg-white/5" />
-        <span className="text-xs text-emerald-500 font-medium">✓ Evaluation complete</span>
+        {revealed >= 4 && (
+          <span className="text-xs text-emerald-500 font-medium animate-[fadeSlideUp_0.3s_ease_both]">
+            ✓ Evaluation complete
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        {AGENTS.map((agent, i) => {
-          const data = results[agent.id];
-          return data ? (
-            <AgentCard key={agent.id} config={agent} data={data} index={i} />
-          ) : null;
+        {agentOrder.map((agentId, i) => {
+          const agent = AGENTS.find((a) => a.id === agentId)!;
+          const data = results[agentId];
+          const show = revealed > i;
+          return (
+            <div
+              key={agentId}
+              className={cn(
+                'transition-all duration-500',
+                show ? 'opacity-100' : 'opacity-0 translate-y-4 pointer-events-none'
+              )}
+            >
+              {show && data && <AgentCard config={agent} data={data} index={0} />}
+            </div>
+          );
         })}
       </div>
 
-      <FinalVerdict score={finalScore} />
+      {/* Final verdict — appears at step 4 */}
+      <div
+        className={cn(
+          'transition-all duration-500',
+          revealed >= 4 ? 'opacity-100' : 'opacity-0 translate-y-4 pointer-events-none'
+        )}
+      >
+        {revealed >= 4 && <FinalVerdict score={finalScore} />}
+      </div>
 
-      {/* Evaluate again button */}
-      <div className="text-center pb-8">
+      {/* Reset button */}
+      <div
+        className={cn(
+          'text-center pb-8 transition-all duration-500',
+          revealed >= 4 ? 'opacity-100' : 'opacity-0'
+        )}
+      >
         <button
           id="reset-btn"
           onClick={() => window.location.reload()}
@@ -425,16 +490,23 @@ export default function HomePage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function handleSubmit() {
-    if (!caseText.trim()) return;
+    const trimmed = caseText.trim();
+    if (trimmed.length < MIN_CHARS) {
+      setErrorMsg(`Please enter at least ${MIN_CHARS} characters.`);
+      setStatus('error');
+      return;
+    }
 
-    setStatus('loading');
+    // Clear previous results immediately before new evaluation
+    setResults(null);
     setErrorMsg(null);
+    setStatus('loading');
 
     try {
       const res = await fetch('/api/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ caseText }),
+        body: JSON.stringify({ caseText: trimmed }),
       });
 
       const data = await res.json();
@@ -453,6 +525,13 @@ export default function HomePage() {
     }
   }
 
+  function handleReset() {
+    setStatus('idle');
+    setResults(null);
+    setErrorMsg(null);
+    setCaseText('');
+  }
+
   const finalScore = results ? computeFinalScore(results) : 0;
 
   return (
@@ -469,13 +548,13 @@ export default function HomePage() {
 
         {/* Error banner */}
         {status === 'error' && errorMsg && (
-          <div className="w-full max-w-3xl mx-auto mb-8 px-4 py-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-sm flex items-start gap-3">
+          <div className="w-full max-w-3xl mx-auto mb-8 px-4 py-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-sm flex items-start gap-3 animate-[fadeSlideUp_0.3s_ease_both]">
             <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold mb-0.5">Değerlendirme başarısız</p>
               <p className="text-red-400/70">{errorMsg}</p>
               <button
-                onClick={() => { setStatus('idle'); setErrorMsg(null); }}
+                onClick={handleReset}
                 className="mt-2 text-xs text-red-400 underline hover:text-red-300"
               >
                 Tekrar dene
