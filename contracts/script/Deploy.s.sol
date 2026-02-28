@@ -6,11 +6,11 @@ import {AgentJury} from "../src/AgentJury.sol";
 
 /// @notice Deployment script for AgentJury.
 ///
-/// Usage (Monad testnet example):
+/// Usage (Monad testnet):
 ///   forge script script/Deploy.s.sol \
-///     --rpc-url https://testnet-rpc.monad.xyz \
+///     --rpc-url $MONAD_RPC_URL \
 ///     --broadcast \
-///     --private-key $PRIVATE_KEY \
+///     --legacy \
 ///     -vvvv
 ///
 /// Set PRIVATE_KEY in your environment (never commit it).
